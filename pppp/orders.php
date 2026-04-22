@@ -1,32 +1,48 @@
-<?php
+that <?php
 require_once 'includes/auth.php';
 requireLogin();
 $user = currentUser();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $user['role'] === 'student') {
-    $menuItemId = intval($_POST['menu_item_id'] ?? 0);
-    $quantity = max(1, intval($_POST['quantity'] ?? 1));
-    if ($menuItemId) {
-        $stmt = $pdo->prepare('SELECT * FROM menu_items WHERE id = ?');
-        $stmt->execute([$menuItemId]);
-        $item = $stmt->fetch();
-        if ($item) {
-            $total = $item['price'] * $quantity;
-            $stmt = $pdo->prepare('INSERT INTO orders (user_id, menu_item_id, quantity, total_price) VALUES (?, ?, ?, ?)');
-            $stmt->execute([$user['id'], $menuItemId, $quantity, $total]);
-            flash('success', 'Order placed successfully.');
-            redirect('orders.php');
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    $orderId = intval($_POST['order_id'] ?? 0);
+    $status = $_POST['status'] ?? '';
+    if (($user['role'] === 'canteen_manager' || $user['role'] === 'system_admin') && $orderId && in_array($status, ['pending', 'completed', 'cancelled'])) {
+        $stmt = $pdo->prepare('UPDATE orders SET status = ? WHERE id = ?');
+        $updated = $stmt->execute([$status, $orderId]);
+        if ($updated) {
+            flash('success', "Order status updated to '" . ucfirst($status) . "'.");
+        } else {
+            flash('error', 'Could not update order.');
+        }
+        redirect('orders.php');
+    }
+
+    if ($user['role'] === 'student') {
+        $menuItemId = intval($_POST['menu_item_id'] ?? 0);
+        $quantity = max(1, intval($_POST['quantity'] ?? 1));
+        if ($menuItemId) {
+            $stmt = $pdo->prepare('SELECT * FROM menu_items WHERE id = ?');
+            $stmt->execute([$menuItemId]);
+            $item = $stmt->fetch();
+            if ($item) {
+                $total = $item['price'] * $quantity;
+                $stmt = $pdo->prepare('INSERT INTO orders (user_id, menu_item_id, quantity, total_price, status) VALUES (?, ?, ?, ?, "pending")');
+                $stmt->execute([$user['id'], $menuItemId, $quantity, $total]);
+                flash('success', 'Order placed successfully.');
+                redirect('orders.php');
+            }
         }
     }
 }
 
 $success = flash('success');
 if ($user['role'] === 'student') {
-    $stmt = $pdo->prepare('SELECT o.*, m.name AS item_name FROM orders o JOIN menu_items m ON o.menu_item_id = m.id WHERE o.user_id = ? ORDER BY o.id DESC');
+    $stmt = $pdo->prepare('SELECT o.*, COALESCE(o.status, "pending") AS status, m.name AS item_name FROM orders o JOIN menu_items m ON o.menu_item_id = m.id WHERE o.user_id = ? ORDER BY o.id DESC');
     $stmt->execute([$user['id']]);
     $orders = $stmt->fetchAll();
 } else {
-    $stmt = $pdo->query('SELECT o.*, u.name AS student_name, m.name AS item_name FROM orders o JOIN users u ON o.user_id = u.id JOIN menu_items m ON o.menu_item_id = m.id ORDER BY o.id DESC');
+    $stmt = $pdo->query('SELECT o.*, COALESCE(o.status, "pending") AS status, u.name AS student_name, m.name AS item_name FROM orders o JOIN users u ON o.user_id = u.id JOIN menu_items m ON o.menu_item_id = m.id ORDER BY o.id DESC');
     $orders = $stmt->fetchAll();
 }
 ?>
@@ -36,12 +52,27 @@ if ($user['role'] === 'student') {
     <meta charset="UTF-8">
     <title>Orders - canteen</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <script>
+    function updateStatus(orderId, status) {
+        if (confirm('Set order status to "' + status + '"?')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.innerHTML = `
+                <input type="hidden" name="action" value="update_status">
+                <input type="hidden" name="order_id" value="${orderId}">
+                <input type="hidden" name="status" value="${status}">
+            `;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+    </script>
 </head>
 <body class="orders-page">
+<?php include 'includes/navigation.php'; ?>
 <div class="container">
     <header>
         <div><h1>Orders</h1></div>
-        <?php include 'includes/navigation.php'; ?>
     </header>
 
     <?php if ($success): ?>
@@ -62,10 +93,16 @@ if ($user['role'] === 'student') {
                 <th>Menu Item</th>
                 <th>Quantity</th>
                 <th>Total Price</th>
+                <th>Status</th>
+                <?php if ($user['role'] === 'canteen_manager' || $user['role'] === 'system_admin'): ?>
+                <th>Actions</th>
+                <?php endif; ?>
                 <th>Placed At</th>
             </tr>
         </thead>
         <tbody>
+
+
         <?php foreach ($orders as $order): ?>
             <tr>
                 <td><?php echo $order['id']; ?></td>
@@ -73,9 +110,20 @@ if ($user['role'] === 'student') {
                 <td><?php echo htmlspecialchars($order['item_name']); ?></td>
                 <td><?php echo $order['quantity']; ?></td>
                 <td><?php echo number_format($order['total_price'], 2); ?></td>
+                <td><span class="status <?php echo strtolower($order['status']); ?>"><?php echo ucfirst($order['status']); ?></span></td>
+                <?php if ($user['role'] === 'canteen_manager' || $user['role'] === 'system_admin'): ?>
+                <td class="order-actions">
+                    <select onchange="updateStatus(<?php echo $order['id']; ?>, this.value)">
+                        <option value="pending" <?php echo ($order['status'] === 'pending') ? 'selected' : ''; ?>>Pending</option>
+                        <option value="completed" <?php echo ($order['status'] === 'completed') ? 'selected' : ''; ?>>Completed</option>
+                        <option value="cancelled" <?php echo ($order['status'] === 'cancelled') ? 'selected' : ''; ?>>Cancelled</option>
+                    </select>
+                </td>
+                <?php endif; ?>
                 <td><?php echo $order['created_at']; ?></td>
             </tr>
         <?php endforeach; ?>
+
         </tbody>
     </table>
 </div>

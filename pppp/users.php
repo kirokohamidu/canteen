@@ -77,11 +77,11 @@ if (isset($_GET['edit'])) {
     <title>Manage Users - canteen</title>
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body class="users-page">
+<body class="users-page"  style="background: linear-gradient(rgba(15, 23, 42, 0.35), rgba(15, 23, 42, 0.35)), url('https://elearning.umu.ac.ug/pluginfile.php?file=%2F1%2Ftheme_academi%2Fslide2image%2F1776174832%2FUganda%20Martyrs%20University%20%281%29%281%29%20%281%29.webp');">
+<?php include 'includes/navigation.php'; ?>
 <div class="container">
     <header>
         <div><h1>Manage Users</h1></div>
-        <?php include 'includes/navigation.php'; ?>
     </header>
 
     <form method="get" action="users.php">

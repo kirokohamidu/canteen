@@ -11,13 +11,13 @@ $user = currentUser();
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body class="dashboard-page">
+<?php include 'includes/navigation.php'; ?>
 <div class="container">
     <header>
         <div>
             <h1>Dashboard</h1>
             <p>Welcome, <?php echo htmlspecialchars($user['name']); ?></p>
         </div>
-        <?php include 'includes/navigation.php'; ?>
     </header>
 
     <div class="hero-slider">
