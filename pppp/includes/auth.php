@@ -1,34 +1,41 @@
 <?php
 session_start();
-require_once __DIR__ . '/../db.php';
 
-function redirect($path) {
+include 'db.php';
+
+function redirect($path)
+{
     header('Location: ' . $path);
     exit;
 }
 
-function isLoggedIn() {
+function isLoggedIn()
+{
     return isset($_SESSION['user']);
 }
 
-function requireLogin() {
+function requireLogin()
+{
     if (!isLoggedIn()) {
         redirect('login.php');
     }
 }
 
-function currentUser() {
+function currentUser()
+{
     return $_SESSION['user'] ?? null;
 }
 
-function getUserByEmail($email) {
-    global $pdo;
-    $stmt = $pdo->prepare('SELECT * FROM users WHERE email = ?');
+function getUserByEmail($email)
+{
+    global $dsn;
+    $stmt = $dsn->prepare('SELECT * FROM users WHERE email = ?');
     $stmt->execute([$email]);
     return $stmt->fetch();
 }
 
-function loginUser($email, $password) {
+function loginUser($email, $password)
+{
     $user = getUserByEmail($email);
     if ($user && $password === $user['password']) {
         unset($user['password']);
@@ -38,12 +45,14 @@ function loginUser($email, $password) {
     return false;
 }
 
-function logoutUser() {
+function logoutUser()
+{
     session_unset();
     session_destroy();
 }
 
-function flash($key, $message = null) {
+function flash($key, $message = null)
+{
     if ($message === null) {
         if (isset($_SESSION['flash'][$key])) {
             $msg = $_SESSION['flash'][$key];
@@ -54,4 +63,3 @@ function flash($key, $message = null) {
     }
     $_SESSION['flash'][$key] = $message;
 }
-
